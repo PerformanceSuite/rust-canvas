@@ -1,0 +1,1 @@
+searchState.loadedDescShard("egui_test", 0, "We derive Deserialize/Serialize so we can persist app …\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.\nCalled once before the first frame.\nCalled by the frame work to save state before shutdown.\nCalled each time the UI needs repainting, which may be …")

@@ -1,0 +1,81 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.2.20:3000
+
+ ✓ Starting...
+ ✓ Ready in 780ms
+ ○ Compiling / ...
+ ✓ Compiled / in 777ms (690 modules)
+ GET / 200 in 911ms
+ GET / 200 in 47ms
+ ✓ Compiled in 173ms (690 modules)
+ GET / 200 in 27ms
+ GET / 200 in 6ms
+ GET / 200 in 70ms
+ ✓ Compiled in 160ms (690 modules)
+ GET / 200 in 33ms
+ GET / 200 in 6ms
+ ✓ Compiled in 121ms (690 modules)
+ GET / 200 in 17ms
+ GET / 200 in 8ms
+ GET / 200 in 70ms
+ GET / 200 in 100ms
+ GET / 200 in 51ms
+ ✓ Compiled in 152ms (690 modules)
+ GET / 200 in 40ms
+ GET / 200 in 6ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ ReferenceError: useRef is not defined
+    at KnobControl (audio-controls.tsx:118:20)
+  116 |   }) => {
+  117 |     const [isDragging, setIsDragging] = useState(false)
+> 118 |     const knobRef = useRef<HTMLDivElement>(null)
+      |                    ^
+  119 |     const rotation = (value / 100) * 270 - 135
+  120 |     const colors = colorClasses[color] || colorClasses.cyan
+  121 | {
+  digest: '3724392758'
+}
+ GET / 500 in 44ms
+ ⨯ ReferenceError: useRef is not defined
+    at KnobControl (audio-controls.tsx:118:20)
+  116 |   }) => {
+  117 |     const [isDragging, setIsDragging] = useState(false)
+> 118 |     const knobRef = useRef<HTMLDivElement>(null)
+      |                    ^
+  119 |     const rotation = (value / 100) * 270 - 135
+  120 |     const colors = colorClasses[color] || colorClasses.cyan
+  121 | {
+  digest: '3724392758'
+}
+ GET / 500 in 24ms
+ ✓ Compiled in 104ms (690 modules)
+ GET / 200 in 66ms
+ GET / 200 in 34ms
+ GET / 200 in 53ms
+ GET / 200 in 52ms
+ GET / 200 in 53ms
+ ✓ Compiled in 163ms (690 modules)
+ GET / 200 in 41ms
+ GET / 200 in 5ms
+ ✓ Compiled in 113ms (690 modules)
+ GET / 200 in 35ms
+ GET / 200 in 7ms
+ ✓ Compiled in 122ms (690 modules)
+ GET / 200 in 28ms
+ GET / 200 in 5ms
+ GET / 200 in 69ms
+ ✓ Compiled in 88ms (329 modules)
+ GET / 200 in 6ms
+ GET / 200 in 52ms
+ GET / 200 in 52ms
+ GET / 200 in 55ms
+ ✓ Compiled in 127ms (690 modules)
+ GET / 200 in 40ms
+ GET / 200 in 71ms
+[?25h
