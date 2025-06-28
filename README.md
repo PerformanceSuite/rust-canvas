@@ -44,14 +44,18 @@ cargo run       # Manual development mode
 - **Icon Buttons** - Power, Play, Pause, Settings, Mic, etc.
 
 ### Interaction Features
-- **Drag & Drop** - Drag widgets from palette to canvas
+- **Single-Click Widget Spawning** - Click any widget in palette to spawn immediately (no two-step process)
+- **Right-to-Left Grid Positioning** - Widgets spawn from top-right corner, filling leftward then down
+- **Dynamic Canvas Resizing** - Widgets automatically reposition when canvas is resized
+- **Smart Collision Detection** - Widgets won't overlap when placed automatically
+- **Panel-Aware Spawning** - Widgets spawn in selected panel (cyan highlight) or main canvas
+- **Drag & Drop** - Drag widgets from palette to canvas for manual positioning
 - **Smart Settings Panel** - Full-edge panels with minimized/expanded states
 - **Edge Snapping** - Settings panels automatically snap to closest canvas edge and occupy entire edge
 - **Full Edge Occupation** - Side panels (Left/Right) stretch full height, Top/Bottom panels stretch full width
 - **Minimize/Expand** - Click settings panel icon to expand, click minimize button (−) to collapse
 - **Edge-Specific Resize** - Side panels resize width, Top/Bottom panels resize height
 - **Edge Indicators** - Color-coded lines show which edge the panel is snapped to
-- **Smart Widget Spawning** - Widgets spawn inside open Settings Panels automatically
 - **Custom Widget Organization** - Organize widgets within Settings Panels
 - **Group Panel Collapse** - Click Group Panels to collapse/expand and hide contained widgets
 - **Nested Panel Behavior** - Panels can contain other panels for complex organization
@@ -60,7 +64,7 @@ cargo run       # Manual development mode
 - **Alignment Guides** - Pink lines for canvas center, yellow for widget alignment
 - **Right-click Editing** - Edit widget properties
 - **Interactive Controls** - Click toggles, adjust knobs/sliders
-- **Smart Positioning** - Widgets won't overlap when placed
+- **0.5px Precise Spacing** - Consistent spacing between widgets with boundary constraints
 - **No Visual Borders** - Clean interface without distracting borders
 
 ### Styling
@@ -73,36 +77,40 @@ cargo run       # Manual development mode
 ## 🎮 How to Use
 
 1. **Start the app** using `./start.sh`
-2. **Add Settings Panel** by clicking "📜 Settings Panel" in the left widget palette
-3. **Drag Settings Panel** toward any edge (Left/Right/Top/Bottom) - it will automatically snap and occupy the entire edge
-4. **Full Edge Panels** - Once snapped:
+2. **Single-Click Widget Spawning** - Click any widget in the palette to spawn it immediately:
+   - **Smart Grid Placement**: Widgets automatically position in right-to-left grid starting from top-right
+   - **No Overlaps**: Collision detection ensures widgets don't overlap
+   - **Dynamic Resizing**: Canvas resize automatically repositions widgets to maintain grid
+3. **Panel Selection** - Click any panel to select it (cyan highlight) for targeted widget placement
+4. **Add Settings Panel** by clicking "📜 Settings Panel" in the left widget palette
+5. **Drag Settings Panel** toward any edge (Left/Right/Top/Bottom) - it will automatically snap and occupy the entire edge
+6. **Full Edge Panels** - Once snapped:
    - **Side panels** (Left/Right) stretch full canvas height
    - **Top/Bottom panels** stretch full canvas width
-5. **Minimize/Expand** - Click the settings icon (⚙️) to expand, click the minimize button (−) to collapse
-6. **Resize Panels** - Drag the resize handle to adjust:
+7. **Minimize/Expand** - Click the settings icon (⚙) to expand, click the minimize button (−) to collapse
+8. **Resize Panels** - Drag the resize handle to adjust:
    - **Side panels**: Adjust width (height is always full)
    - **Top/Bottom panels**: Adjust height (width is always full)
-7. **Edge Indicators** - Watch for colored lines showing which edge the panel is snapped to:
+9. **Edge Indicators** - Watch for colored lines showing which edge the panel is snapped to:
    - **Cyan** = Left edge
    - **Pink** = Right edge  
    - **Green** = Top edge
    - **Yellow** = Bottom edge
-8. **Smart Widget Placement** - When adding widgets:
-   - **Panel Open**: Widgets spawn inside the Settings Panel automatically
-   - **Panel Minimized**: Widgets spawn on the main canvas as usual
-9. **Add Widgets** from the left palette - they'll appear in the panel if one is open
-10. **Group Organization** - Use Group Panels (📁) for collapsible widget organization:
+10. **Smart Widget Placement** - When adding widgets:
+    - **Panel Selected**: Widgets spawn inside the selected panel automatically
+    - **No Panel Selected**: Widgets spawn on main canvas using grid positioning
+11. **Group Organization** - Use Group Panels (📁) for collapsible widget organization:
     - **▼ Expanded**: Shows all contained widgets
     - **▶ Collapsed**: Hides contained widgets, shows only title
     - **Click title**: Toggle collapse/expand state
     - **Widget count**: Shows number of organized widgets
-11. **Drag Widgets** around the canvas to position them
-12. **Resize Panels & Status Bars** by dragging the corner handles (diagonal lines)
-13. **Edit Properties** by right-clicking on widgets
-14. **Interact** with controls - click toggles, drag knobs, adjust sliders
-15. **Use Alignment** - pink/yellow guide lines appear when dragging
-16. **Save Your Layout** - Click "💾 Save Layout" to preserve your setup
-17. **Clear Canvas** - Click "🗑️ Clear Canvas" to remove all widgets
+12. **Manual Positioning** - Drag widgets around the canvas for custom positioning
+13. **Resize Panels & Status Bars** by dragging the corner handles (diagonal lines)
+14. **Edit Properties** by right-clicking on widgets
+15. **Interact** with controls - click toggles, drag knobs, adjust sliders
+16. **Use Alignment** - pink/yellow guide lines appear when dragging
+17. **Save Your Layout** - Click "💾 Save Layout" to preserve your setup
+18. **Clear Canvas** - Click "🗑️ Clear Canvas" to remove all widgets
 
 ## 🛠️ Development
 
