@@ -32,189 +32,9 @@
 
 use egui::{Color32, Pos2, Rect, Ui, Vec2, FontId, Align2, RichText, Stroke};
 use std::f32::consts::PI;
-use serde::{Deserialize, Serialize};
-use crate::canvas::widgets::rendering::*;
 use crate::canvas::constants::*;
 use crate::canvas::panels::PanelManager;
-
-// Application version
-pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-/// Color themes for widgets matching the React app palette
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum WidgetColor {
-    Cyan,
-    Pink,
-    Green,
-    Yellow,
-    Red,
-}
-
-impl WidgetColor {
-    pub fn to_color32(&self) -> Color32 {
-        match self {
-            WidgetColor::Cyan => CYAN,
-            WidgetColor::Pink => PINK,
-            WidgetColor::Green => GREEN,
-            WidgetColor::Yellow => YELLOW,
-            WidgetColor::Red => RED,
-        }
-    }
-}
-
-// State management enum for future refactoring - currently unused
-// #[derive(Debug, Clone, PartialEq)]
-// pub enum InteractionState {
-//     Idle,
-//     Dragging { widget_idx: usize, offset: Vec2 },
-//     Interacting { widget_idx: usize, last_pos: Pos2 },
-//     Resizing { widget_idx: usize, start_size: Vec2, last_pos: Pos2 },
-//     PaletteDragging { widget_type: WidgetType, drag_pos: Option<Pos2> },
-// }
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum IconType {
-    Power,
-    Play,
-    Pause,
-    SkipBack,
-    SkipForward,
-    Volume,
-    Mic,
-    Settings,
-    Mute,
-    Zap,
-}
-
-/// Edge snapping positions for settings panels
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum CanvasEdge {
-    Left,
-    Right,
-    Top,
-    Bottom,
-    None, // For when not snapped to any edge
-}
-
-/// All supported widget types with their configuration parameters
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum WidgetType {
-    Knob { value: f32, min: f32, max: f32, label: String, color: WidgetColor },
-    ToggleSwitch { on: bool, label: String, color: WidgetColor, glow: bool },
-    PushButton { active: bool, icon: String, label: String, color: WidgetColor, size: f32 },
-    VuMeter { level: f32, peak_level: f32, label: String, color: WidgetColor },
-    HorizontalSlider { value: f32, min: f32, max: f32, label: String, color: WidgetColor },
-    VerticalSlider { value: f32, min: f32, max: f32, label: String, color: WidgetColor },
-    LevelIndicator { level: f32, segments: usize, label: String },
-    TextLabel { text: String, size: f32, color: WidgetColor },
-    Panel { title: String, color: WidgetColor, width: f32, height: f32, collapsed: bool, contained_widgets: Vec<usize>, minimize_to_settings_icon: bool },
-    StatusBar { cpu: f32, ram: f32, latency: f32, online: bool },
-    IconButton { icon: IconType, label: String, active: bool, color: WidgetColor, size: f32 },
-    Settings { label: String, color: WidgetColor, minimized: bool, contained_widgets: Vec<usize> },
-}
-
-/// A widget instance with position, size, and type information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DraggableWidget {
-    pub id: usize,
-    pub widget_type: WidgetType,
-    pub position: Pos2,
-    pub size: Vec2,
-}
-
-impl DraggableWidget {
-    pub fn new(id: usize, widget_type: WidgetType, position: Pos2) -> Self {
-        let size = Self::calculate_size(&widget_type);
-        Self {
-            id,
-            widget_type,
-            position,
-            size,
-        }
-    }
-
-    pub fn calculate_size(widget_type: &WidgetType) -> Vec2 {
-        match widget_type {
-            WidgetType::Knob { .. } => Vec2::new(104.0, 124.0),
-            WidgetType::ToggleSwitch { .. } => Vec2::new(68.0, 49.0),
-            WidgetType::PushButton { size, .. } => Vec2::new(size + 10.0, size + 30.0),
-            WidgetType::VuMeter { .. } => Vec2::new(26.0, 158.0),
-            WidgetType::HorizontalSlider { .. } => Vec2::new(176.0, 28.0),
-            WidgetType::VerticalSlider { .. } => Vec2::new(28.0, 146.0),
-            WidgetType::LevelIndicator { .. } => Vec2::new(120.0, 40.0),
-            WidgetType::TextLabel { size, .. } => Vec2::new(size * 8.0, size * 1.5),
-            WidgetType::Panel { width, height, collapsed, minimize_to_settings_icon, .. } => {
-                if *collapsed {
-                    if *minimize_to_settings_icon {
-                        Vec2::new(40.0, 40.0) // Settings icon size when minimized with special setting
-                    } else {
-                        Vec2::new(*width, 40.0) // Just title bar height when collapsed normally
-                    }
-                } else {
-                    Vec2::new(*width, *height)
-                }
-            },
-            WidgetType::StatusBar { .. } => Vec2::new(400.0, 60.0),
-            WidgetType::IconButton { size, .. } => Vec2::new(size + 10.0, size + 30.0),
-            WidgetType::Settings { minimized, .. } => {
-                if *minimized {
-                    Vec2::new(40.0, 40.0) // Icon size when minimized
-                } else {
-                    Vec2::new(250.0, 300.0) // Default settings panel size when expanded
-                }
-            },
-        }
-    }
-
-    pub fn get_rect(&self) -> Rect {
-        Rect::from_min_size(self.position, self.size)
-    }
-
-    pub fn render(&mut self, ui: &mut Ui) {
-        let rect = self.get_rect();
-        let painter = ui.painter();
-
-        match &mut self.widget_type {
-            WidgetType::Knob { value, min, max, label, color } => {
-                render_knob(painter, rect, value, *min, *max, label, *color);
-            }
-            WidgetType::ToggleSwitch { on, label, color, glow } => {
-                render_toggle_switch(painter, rect, on, label, *color, *glow);
-            }
-            WidgetType::PushButton { active, icon, label, color, size } => {
-                render_push_button(painter, rect, active, icon, label, *color, *size);
-            }
-            WidgetType::VuMeter { level, peak_level, label, color } => {
-                render_vu_meter(painter, rect, *level, peak_level, label, *color);
-            }
-            WidgetType::HorizontalSlider { value, min, max, label, color } => {
-                render_horizontal_slider(painter, rect, value, *min, *max, label, *color);
-            }
-            WidgetType::VerticalSlider { value, min, max, label, color } => {
-                render_vertical_slider(painter, rect, value, *min, *max, label, *color);
-            }
-            WidgetType::LevelIndicator { level, segments, label } => {
-                render_level_indicator(painter, rect, *level, *segments, label);
-            }
-            WidgetType::TextLabel { text, size, color } => {
-                render_text_label(painter, rect, text, *size, *color);
-            }
-            WidgetType::Panel { title, color, collapsed, contained_widgets, minimize_to_settings_icon, .. } => {
-                render_panel(painter, rect, title, *color, *collapsed, contained_widgets, *minimize_to_settings_icon);
-            }
-            WidgetType::StatusBar { cpu, ram, latency, online } => {
-                render_status_bar(painter, rect, *cpu, *ram, *latency, *online);
-            }
-            WidgetType::IconButton { icon, label, active, color, size } => {
-                render_icon_button(painter, rect, *icon, label, active, *color, *size);
-            }
-            WidgetType::Settings { label, color, minimized, contained_widgets } => {
-                render_settings_panel(painter, rect, label, *color, *minimized, CanvasEdge::None, contained_widgets);
-            }
-        }
-    }
-
-}
+use crate::canvas::widgets::types::*;
 
 
 /// Main canvas for drag-and-drop widget management
@@ -230,7 +50,6 @@ pub struct DragDropCanvas {
     
     // Panel selection state
     pub selected_panel: Option<usize>, // ID of currently selected panel for widget placement
-    pub pending_widget: Option<WidgetType>, // Widget type selected from palette, waiting to be placed
     
     // Drag and drop state (cleaned up but kept compatible)
     pub dragging_widget: Option<usize>, // Index of currently dragging widget
@@ -272,7 +91,6 @@ impl Default for DragDropCanvas {
             editing_widget: None,
             show_edit_window: false,
             selected_panel: None,
-            pending_widget: None,
             dragging_widget: None,
             drag_offset: Vec2::ZERO,
             interacting_widget: None,
@@ -317,6 +135,231 @@ impl DragDropCanvas {
                 }
             })
             .collect()
+    }
+    
+    /// Simple, reliable right-to-left grid positioning
+    fn find_next_canvas_position(&self, widget_size: Vec2) -> Pos2 {
+        let margin = 20.0;
+        let spacing = 0.5;
+        
+        // Define the grid area
+        let grid_left = self.canvas_rect.left() + margin;
+        let grid_right = self.canvas_rect.right() - margin;
+        let grid_top = self.canvas_rect.top() + margin;
+        let grid_bottom = self.canvas_rect.bottom() - margin;
+        
+        // Create a simple position list: start from top-right, move left, then down
+        let mut positions = Vec::new();
+        
+        // Generate all possible grid positions (right-to-left, top-to-bottom)
+        let mut y = grid_top;
+        while y + widget_size.y <= grid_bottom {
+            let mut x = grid_right - widget_size.x;
+            while x >= grid_left {
+                positions.push(Pos2::new(x, y));
+                x -= widget_size.x + spacing;
+            }
+            y += widget_size.y + spacing;
+        }
+        
+        // Find the first available position
+        for pos in positions {
+            let test_rect = Rect::from_min_size(pos, widget_size);
+            if !self.position_conflicts_with_widgets(test_rect) {
+                return pos;
+            }
+        }
+        
+        // Fallback: top-right corner
+        Pos2::new(grid_right - widget_size.x, grid_top)
+    }
+    
+    /// Simple panel positioning (same logic as canvas)
+    fn find_next_panel_position(&self, panel_id: usize, widget_size: Vec2) -> Option<Pos2> {
+        let panel_widget = self.widgets.iter().find(|w| w.id == panel_id)?;
+        let panel_rect = panel_widget.get_rect();
+        
+        let padding = 0.5;
+        let spacing = 0.5;
+        let header_height = 40.0;
+        
+        // Define panel content area
+        let content_left = panel_rect.left() + padding;
+        let content_right = panel_rect.right() - padding;
+        let content_top = panel_rect.top() + header_height;
+        let content_bottom = panel_rect.bottom() - padding;
+        
+        // Check if widget fits at all
+        if widget_size.x > content_right - content_left || widget_size.y > content_bottom - content_top {
+            return None;
+        }
+        
+        // Generate positions (right-to-left, top-to-bottom)
+        let mut positions = Vec::new();
+        let mut y = content_top;
+        while y + widget_size.y <= content_bottom {
+            let mut x = content_right - widget_size.x;
+            while x >= content_left {
+                positions.push(Pos2::new(x, y));
+                x -= widget_size.x + spacing;
+            }
+            y += widget_size.y + spacing;
+        }
+        
+        // Find first available position
+        for pos in positions {
+            let test_rect = Rect::from_min_size(pos, widget_size);
+            if !self.position_conflicts_with_widgets(test_rect) {
+                return Some(pos);
+            }
+        }
+        
+        None // Panel full
+    }
+    
+    /// Constrain widget position to stay within panel bounds with 0.5px padding
+    fn constrain_widget_to_panel(&self, widget_pos: Pos2, widget_size: Vec2, panel_id: usize) -> Pos2 {
+        if let Some(panel_widget) = self.widgets.iter().find(|w| w.id == panel_id) {
+            let panel_rect = panel_widget.get_rect();
+            let padding = 0.5;
+            let header_height = 40.0;
+            
+            let min_x = panel_rect.left() + padding;
+            let max_x = panel_rect.right() - padding - widget_size.x;
+            let min_y = panel_rect.top() + header_height;
+            let max_y = panel_rect.bottom() - padding - widget_size.y;
+            
+            Pos2::new(
+                widget_pos.x.clamp(min_x, max_x),
+                widget_pos.y.clamp(min_y, max_y)
+            )
+        } else {
+            widget_pos
+        }
+    }
+    
+    /// Check if a rect conflicts with any existing widget (tight grid with 0.5px spacing)
+    fn position_conflicts_with_widgets(&self, test_rect: Rect) -> bool {
+        for widget in &self.widgets {
+            let widget_rect = widget.get_rect();
+            
+            // Skip minimized panels (they're very small and shouldn't block placement)
+            if let WidgetType::Panel { collapsed, minimize_to_settings_icon, .. } = &widget.widget_type {
+                if *collapsed && *minimize_to_settings_icon {
+                    continue; // Skip gear icon panels - they're tiny
+                }
+            }
+            if let WidgetType::Settings { minimized, .. } = &widget.widget_type {
+                if *minimized {
+                    continue; // Skip minimized settings panels
+                }
+            }
+            
+            // Check for overlap - with tight grid, widgets can be very close (0.5px apart)
+            // Only prevent actual overlap, not close proximity
+            if test_rect.intersects(widget_rect) {
+                return true;
+            }
+        }
+        false
+    }
+    
+    /// Get default size for a widget type
+    fn get_widget_default_size(widget_type: &WidgetType) -> Vec2 {
+        match widget_type {
+            WidgetType::Knob { .. } => Vec2::new(90.0, 110.0),
+            WidgetType::ToggleSwitch { .. } => Vec2::new(80.0, 60.0),
+            WidgetType::PushButton { .. } => Vec2::new(80.0, 80.0),
+            WidgetType::VuMeter { .. } => Vec2::new(40.0, 160.0),
+            WidgetType::HorizontalSlider { .. } => Vec2::new(150.0, 40.0),
+            WidgetType::VerticalSlider { .. } => Vec2::new(40.0, 120.0),
+            WidgetType::LevelIndicator { .. } => Vec2::new(120.0, 40.0),
+            WidgetType::TextLabel { .. } => Vec2::new(100.0, 30.0),
+            WidgetType::Panel { .. } => Vec2::new(200.0, 150.0),
+            WidgetType::StatusBar { .. } => Vec2::new(300.0, 40.0),
+            WidgetType::IconButton { .. } => Vec2::new(60.0, 80.0),
+            WidgetType::Settings { .. } => Vec2::new(250.0, 300.0),
+        }
+    }
+    
+    /// Spawn widget directly (either on canvas or in selected panel)
+    fn spawn_widget_directly(&mut self, widget_type: WidgetType) {
+        let widget_size = Self::get_widget_default_size(&widget_type);
+        
+        if let Some(panel_id) = self.selected_panel {
+            // Try to place in selected panel
+            if let Some(pos) = self.find_next_panel_position(panel_id, widget_size) {
+                self.add_widget_to_selected_panel(widget_type, pos);
+            } else {
+                // Panel is full, place on canvas instead
+                let pos = self.find_next_canvas_position(widget_size);
+                self.add_widget(widget_type, pos);
+            }
+        } else {
+            // Place on canvas
+            let pos = self.find_next_canvas_position(widget_size);
+            self.add_widget(widget_type, pos);
+        }
+    }
+    
+    /// Simple grid reposition on canvas resize
+    fn reposition_canvas_widgets_for_resize(&mut self) {
+        let margin = 20.0;
+        let spacing = 0.5;
+        
+        // Get canvas widgets only (not in panels)
+        let mut canvas_widgets: Vec<usize> = self.widgets.iter()
+            .enumerate()
+            .filter_map(|(idx, widget)| {
+                if !self.is_widget_contained(widget.id) {
+                    Some(idx)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        
+        // Sort by current position (preserve order)
+        canvas_widgets.sort_by(|&a, &b| {
+            let pos_a = self.widgets[a].position;
+            let pos_b = self.widgets[b].position;
+            
+            // Sort by row first, then by column (right-to-left)
+            match pos_a.y.partial_cmp(&pos_b.y) {
+                Some(std::cmp::Ordering::Equal) => pos_b.x.partial_cmp(&pos_a.x).unwrap_or(std::cmp::Ordering::Equal),
+                other => other.unwrap_or(std::cmp::Ordering::Equal),
+            }
+        });
+        
+        // Generate new grid positions
+        let grid_left = self.canvas_rect.left() + margin;
+        let grid_right = self.canvas_rect.right() - margin;
+        let grid_top = self.canvas_rect.top() + margin;
+        let grid_bottom = self.canvas_rect.bottom() - margin;
+        
+        let mut new_positions = Vec::new();
+        let mut y = grid_top;
+        
+        // Assume uniform widget size for simplicity (can be improved later)
+        let widget_size = Vec2::new(90.0, 110.0); // Default knob size
+        
+        while y + widget_size.y <= grid_bottom {
+            let mut x = grid_right - widget_size.x;
+            while x >= grid_left {
+                new_positions.push(Pos2::new(x, y));
+                x -= widget_size.x + spacing;
+            }
+            y += widget_size.y + spacing;
+        }
+        
+        // Apply new positions to widgets
+        for (i, &widget_idx) in canvas_widgets.iter().enumerate() {
+            if let Some(&new_pos) = new_positions.get(i) {
+                if let Some(widget) = self.widgets.get_mut(widget_idx) {
+                    widget.position = new_pos;
+                }
+            }
+        }
     }
     
 }
@@ -445,11 +488,11 @@ impl DragDropCanvas {
     }
     
     pub fn add_widget(&mut self, widget_type: WidgetType, _position: Pos2) {
-        // Calculate position immediately if canvas_rect is available, otherwise use safe default
+        // Calculate position using the new right-to-left logic
         let position = if self.canvas_rect != Rect::NOTHING {
-            // Canvas size is known, calculate proper position right now
-            let canvas_widget_count = self.count_canvas_widgets();
-            self.calculate_grid_position(canvas_widget_count, &widget_type)
+            // Canvas size is known, use new right-to-left positioning
+            let widget_size = Self::get_widget_default_size(&widget_type);
+            self.find_next_canvas_position(widget_size)
         } else {
             // Canvas size unknown, use safe position and mark for later repositioning
             self.needs_repositioning = true;
@@ -493,19 +536,29 @@ impl DragDropCanvas {
             available_rect.max
         );
         
+        // Check if canvas size changed (for dynamic repositioning)
+        let canvas_size_changed = self.canvas_rect != Rect::NOTHING && 
+                                 (self.canvas_rect.width() != actual_canvas_rect.width() || 
+                                  self.canvas_rect.height() != actual_canvas_rect.height());
+        
         self.canvas_rect = actual_canvas_rect;
         
         // Reposition canvas widgets if needed (after canvas size is known)
         if self.needs_repositioning {
             self.reposition_canvas_widgets();
             self.needs_repositioning = false;
+        } else if canvas_size_changed {
+            // Canvas size changed - reposition widgets to maintain tight grid
+            self.reposition_canvas_widgets_for_resize();
         }
 
         // Draw canvas background
         ui.painter().rect_filled(actual_canvas_rect, 0.0, BLACK);
 
-        // Handle drag and drop input
-        self.handle_drag_drop(ui);
+        // Handle drag and drop input (only when edit window is not open)
+        if !self.show_edit_window {
+            self.handle_drag_drop(ui);
+        }
 
         // Collect which widgets should be rendered (not in minimized panels)
         let widgets_to_render: Vec<bool> = self.widgets.iter()
@@ -548,28 +601,27 @@ impl DragDropCanvas {
         
         // Draw selection highlight
         if let Some(selected_panel_id) = self.selected_panel {
-            // Highlight selected panel with cyan
+            // Highlight selected panel with cyan (only if not collapsed/minimized)
             if let Some(selected_panel) = self.widgets.iter().find(|w| w.id == selected_panel_id) {
-                let rect = selected_panel.get_rect().expand(2.0);
-                let stroke = Stroke::new(3.0, CYAN);
+                let should_show_border = match &selected_panel.widget_type {
+                    WidgetType::Panel { collapsed, .. } => !collapsed,
+                    WidgetType::Settings { minimized, .. } => !minimized,
+                    _ => true, // For any other widget types, show the border
+                };
                 
-                // Draw highlight border using line segments
-                painter.line_segment([rect.left_top(), rect.right_top()], stroke);
-                painter.line_segment([rect.right_top(), rect.right_bottom()], stroke);
-                painter.line_segment([rect.right_bottom(), rect.left_bottom()], stroke);
-                painter.line_segment([rect.left_bottom(), rect.left_top()], stroke);
+                if should_show_border {
+                    let rect = selected_panel.get_rect().expand(2.0);
+                    let stroke = Stroke::new(3.0, CYAN);
+                    
+                    // Draw highlight border using line segments
+                    painter.line_segment([rect.left_top(), rect.right_top()], stroke);
+                    painter.line_segment([rect.right_top(), rect.right_bottom()], stroke);
+                    painter.line_segment([rect.right_bottom(), rect.left_bottom()], stroke);
+                    painter.line_segment([rect.left_bottom(), rect.left_top()], stroke);
+                }
             }
-        } else {
-            // No panel selected - highlight main canvas with yellow
-            let canvas_rect = self.canvas_rect.shrink(5.0); // Slight inset
-            let stroke = Stroke::new(2.0, YELLOW);
-            
-            // Draw highlight border around canvas
-            painter.line_segment([canvas_rect.left_top(), canvas_rect.right_top()], stroke);
-            painter.line_segment([canvas_rect.right_top(), canvas_rect.right_bottom()], stroke);
-            painter.line_segment([canvas_rect.right_bottom(), canvas_rect.left_bottom()], stroke);
-            painter.line_segment([canvas_rect.left_bottom(), canvas_rect.left_top()], stroke);
         }
+        // No main canvas selection highlighting needed anymore
 
         // Draw static settings icon in top-left
         self.render_settings_icon(ui);
@@ -626,7 +678,7 @@ impl DragDropCanvas {
         if mouse_pressed {
             if let Some(pos) = mouse_pos {
                 // Check if on canvas (not on side panel)
-                if pos.x > 220.0 { // Beyond the palette width
+                if pos.x > PALETTE_WIDTH { // Beyond the palette width
                     // Check if we clicked on a panel
                     let mut clicked_panel_id = None;
                     for widget in self.widgets.iter().rev() {
@@ -649,42 +701,14 @@ impl DragDropCanvas {
                         }
                     }
                     
-                    // Handle the click based on whether we have a pending widget
-                    if let Some(widget_type) = self.pending_widget.take() {
-                        // We have a pending widget - place it
-                        if let Some(panel_id) = clicked_panel_id {
-                            // Clicked on a panel - place widget in that panel and select it
-                            self.selected_panel = Some(panel_id);
-                            self.add_widget_to_selected_panel(widget_type, pos);
-                        } else if let Some(panel_id) = self.selected_panel {
-                            // Have a selected panel - check if click is within that panel
-                            let click_in_selected_panel = self.widgets.iter()
-                                .find(|w| w.id == panel_id)
-                                .map(|w| w.get_rect().contains(pos))
-                                .unwrap_or(false);
-                            
-                            if click_in_selected_panel {
-                                // Click is inside the selected panel - place widget there
-                                self.add_widget_to_selected_panel(widget_type, pos);
-                            } else {
-                                // Click is outside the selected panel - place on canvas
-                                self.add_widget(widget_type, pos);
-                            }
-                        } else {
-                            // No panel selected - place on canvas
-                            self.add_widget(widget_type, pos);
-                        }
-                        return; // Don't process other operations after placing widget
+                    // Handle panel selection (no pending widget logic needed)
+                    if let Some(panel_id) = clicked_panel_id {
+                        self.selected_panel = Some(panel_id);
+                        // Don't return here - let dragging logic run for moving panels
                     } else {
-                        // No pending widget - handle panel selection, but still allow dragging
-                        if let Some(panel_id) = clicked_panel_id {
-                            self.selected_panel = Some(panel_id);
-                            // Don't return here - let dragging logic run for moving panels
-                        } else {
-                            // Clicked on empty canvas - deselect panel
-                            self.selected_panel = None;
-                            // Don't return here - let dragging logic run
-                        }
+                        // Clicked on empty canvas - deselect panel
+                        self.selected_panel = None;
+                        // Don't return here - let dragging logic run
                     }
                 }
             }
@@ -698,7 +722,7 @@ impl DragDropCanvas {
                 // If mouse released, drop the widget
                 if mouse_released {
                     // Check if dropped on canvas (not on side panel)
-                    if pos.x > 220.0 { // Beyond the palette width
+                    if pos.x > PALETTE_WIDTH { // Beyond the palette width
                         // Check if we dropped on a panel
                         let mut dropped_on_panel_id = None;
                         for widget in self.widgets.iter().rev() {
@@ -800,6 +824,13 @@ impl DragDropCanvas {
                                 );
                                 let distance = (pos - knob_center).length();
                                 if distance <= 32.0 { // Within knob radius
+                                    // Check if this widget is inside a panel and preserve panel selection
+                                    let widget_panel_id = PanelManager::find_widget_container_panel_id(&self.widgets, widget.id);
+                                    if let Some(panel_id) = widget_panel_id {
+                                        // Widget is inside a panel - maintain that panel as selected
+                                        self.selected_panel = Some(panel_id);
+                                    }
+                                    
                                     self.interacting_widget = Some(idx);
                                     self.last_mouse_pos = Some(pos);
                                     break;
@@ -818,13 +849,21 @@ impl DragDropCanvas {
                                     Vec2::new(widget.size.x, 40.0),
                                 );
                                 if title_area.contains(pos) && pos.x < widget.position.x + 30.0 {
-                                    // Handle Panel collapse click
+                                    // Handle Panel collapse click - maintain panel selection
+                                    self.selected_panel = Some(widget.id);
                                     self.handle_widget_interaction(idx, pos);
                                     return; // Exit early
                                 }
                                 // Just allow dragging the panel - no area selection
                             }
                             _ => {}
+                        }
+                        
+                        // Check if this widget is inside a panel and preserve panel selection
+                        let widget_panel_id = PanelManager::find_widget_container_panel_id(&self.widgets, widget.id);
+                        if let Some(panel_id) = widget_panel_id {
+                            // Widget is inside a panel - maintain that panel as selected
+                            self.selected_panel = Some(panel_id);
                         }
                         
                         // For non-knob widgets or outside knob center, allow for dragging
@@ -864,22 +903,12 @@ impl DragDropCanvas {
                         return;
                     };
                     
-                    // Check if widget is contained in a Settings Panel and constrain accordingly
+                    // Check if widget is contained in any panel and constrain accordingly with 0.5px padding
                     let mut final_pos = if let Some(container_panel) = PanelManager::find_widget_container_panel(&self.widgets, idx) {
-                        // Constrain to Settings Panel bounds
-                        let panel_rect = self.widgets[container_panel].get_rect();
-                        let content_area = Rect::from_min_size(
-                            Pos2::new(panel_rect.left() + PANEL_MARGIN, panel_rect.top() + PANEL_TITLE_HEIGHT),
-                            Vec2::new((panel_rect.width() - PANEL_MARGIN * 2.0).max(50.0), (panel_rect.height() - PANEL_TITLE_HEIGHT - PANEL_MARGIN).max(50.0)),
-                        );
-                        let max_x = (content_area.max.x - widget_size.x).max(content_area.min.x);
-                        let max_y = (content_area.max.y - widget_size.y).max(content_area.min.y);
-                        Pos2::new(
-                            new_pos.x.clamp(content_area.min.x, max_x),
-                            new_pos.y.clamp(content_area.min.y, max_y),
-                        )
+                        // Use the new constraint method with 0.5px padding
+                        self.constrain_widget_to_panel(new_pos, widget_size, self.widgets[container_panel].id)
                     } else {
-                        // Constrain to canvas bounds
+                        // Constrain to canvas bounds (no padding needed for canvas)
                         let max_x = (self.canvas_rect.max.x - widget_size.x).max(self.canvas_rect.min.x);
                         let max_y = (self.canvas_rect.max.y - widget_size.y).max(self.canvas_rect.min.y);
                         Pos2::new(
@@ -1275,55 +1304,6 @@ impl DragDropCanvas {
 
     // Removed unused positioning methods for cleaner architecture
     
-    fn get_next_position_in_panel_for_widget(&self, panel_idx: usize, widget_id: Option<usize>) -> Pos2 {
-        if let Some(panel) = self.widgets.get(panel_idx) {
-            let panel_rect = panel.get_rect();
-            
-            // Start position within the panel (accounting for title bar)
-            let start_x = panel_rect.left() + PANEL_MARGIN;
-            let start_y = panel_rect.top() + PANEL_TITLE_HEIGHT + PANEL_MARGIN;
-            
-            // Get existing widgets in this panel
-            let contained_widgets = match &panel.widget_type {
-                WidgetType::Panel { contained_widgets, .. } => contained_widgets,
-                WidgetType::Settings { contained_widgets, .. } => contained_widgets,
-                _ => return Pos2::new(start_x, start_y),
-            };
-            
-            // Count widgets excluding the one being positioned (if specified)
-            let widget_count = if let Some(exclude_id) = widget_id {
-                contained_widgets.iter().filter(|&&id| id != exclude_id).count()
-            } else {
-                contained_widgets.len()
-            };
-            
-            // Simple grid layout - place widgets in rows
-            let widgets_per_row = ((panel_rect.width() - (PANEL_MARGIN * 2.0)) / WIDGET_SPACING_IN_PANEL).max(1.0) as usize;
-            let row = widget_count / widgets_per_row;
-            let col = widget_count % widgets_per_row;
-            
-            let x = start_x + col as f32 * WIDGET_SPACING_IN_PANEL;
-            let y = start_y + row as f32 * WIDGET_SPACING_IN_PANEL;
-            
-            // Make sure position is within panel bounds, but be more forgiving
-            let widget_size = Vec2::new(60.0, 60.0);
-            let max_x = panel_rect.right() - widget_size.x - PANEL_MARGIN;
-            let max_y = panel_rect.bottom() - widget_size.y - PANEL_MARGIN;
-            
-            let final_x = x.min(max_x).max(start_x);
-            let final_y = y.min(max_y).max(start_y);
-            
-            Pos2::new(final_x, final_y)
-        } else {
-            // Fallback to canvas center if available
-            if self.canvas_rect != Rect::NOTHING {
-                Pos2::new(self.canvas_rect.center().x, self.canvas_rect.center().y)
-            } else {
-                Pos2::new(400.0, 300.0)
-            }
-        }
-    }
-
     // Canvas positioning logic moved to reposition_canvas_widgets for better organization
     
     fn reposition_canvas_widgets(&mut self) {
@@ -1377,83 +1357,6 @@ impl DragDropCanvas {
         Pos2::new(x.min(max_x), y.min(max_y))
     }
 
-    fn check_and_place_in_panel(&mut self, widget_idx: usize, _drop_pos: Pos2) {
-        // Find which panel (if any) the widget was dropped on using proper layering
-        let mut target_panel_idx = None;
-        let mut highest_layer = -1; // Higher numbers = higher layer (rendered later = on top)
-        
-        if let Some(dragged_widget) = self.widgets.get(widget_idx) {
-            let widget_rect = dragged_widget.get_rect();
-            
-            for (idx, panel) in self.widgets.iter().enumerate() {
-                if idx == widget_idx {
-                    continue; // Skip the widget being dragged
-                }
-                
-                if PanelManager::is_panel_accepting_widgets(panel) {
-                    let panel_rect = panel.get_rect();
-                    
-                    // Check if widget center is inside this panel
-                    if panel_rect.contains(widget_rect.center()) {
-                        // Calculate layer based on containment depth and render order
-                        let layer = PanelManager::get_panel_layer(&self.widgets, idx);
-                        
-                        if layer > highest_layer {
-                            highest_layer = layer;
-                            target_panel_idx = Some(idx);
-                        }
-                    }
-                }
-            }
-        }
-        
-        if let Some(panel_idx) = target_panel_idx {
-            if let Some(dragged_widget) = self.widgets.get(widget_idx) {
-                let _widget_size = dragged_widget.size;
-                let widget_id = dragged_widget.id;
-                
-                // Auto-resizing functionality removed as requested by user
-                
-                // For panels, keep the dragged position but constrain to container bounds
-                // For other widgets, use grid positioning
-                let new_position = if matches!(dragged_widget.widget_type, WidgetType::Panel { .. }) {
-                    // Keep the current dragged position but constrain it to the container panel bounds
-                    let container_panel = &self.widgets[panel_idx];
-                    let container_rect = container_panel.get_rect();
-                    let content_area = Rect::from_min_size(
-                        Pos2::new(container_rect.left() + PANEL_MARGIN, container_rect.top() + PANEL_TITLE_HEIGHT),
-                        Vec2::new((container_rect.width() - PANEL_MARGIN * 2.0).max(50.0), (container_rect.height() - PANEL_TITLE_HEIGHT - PANEL_MARGIN).max(50.0)),
-                    );
-                    
-                    // Constrain the widget's current position to fit within the content area
-                    let current_pos = dragged_widget.position;
-                    let widget_size = dragged_widget.size;
-                    let max_x = (content_area.max.x - widget_size.x).max(content_area.min.x);
-                    let max_y = (content_area.max.y - widget_size.y).max(content_area.min.y);
-                    
-                    Pos2::new(
-                        current_pos.x.clamp(content_area.min.x, max_x),
-                        current_pos.y.clamp(content_area.min.y, max_y),
-                    )
-                } else {
-                    // Use grid positioning for regular widgets
-                    self.get_next_position_in_panel_for_widget(panel_idx, Some(widget_id))
-                };
-                
-                // Remove widget from any existing containers first
-                PanelManager::remove_widget_from_containers(&mut self.widgets, widget_id);
-                
-                // Update widget position and add to panel
-                if let Some(widget_mut) = self.widgets.get_mut(widget_idx) {
-                    widget_mut.position = new_position;
-                }
-                
-                // Add widget to panel's contained_widgets list
-                PanelManager::add_widget_to_panel(&mut self.widgets, panel_idx, widget_id);
-            }
-        }
-    }
-
 
     fn is_widget_in_minimized_panel(&self, widget_id: usize) -> bool {
         self.is_widget_in_minimized_panel_recursive(widget_id, &mut std::collections::HashSet::new())
@@ -1492,28 +1395,6 @@ impl DragDropCanvas {
         
         false
     }
-    
-
-    fn calculate_edge_snap(&self, position: Pos2, size: Vec2) -> CanvasEdge {
-        let snap_threshold = 50.0; // Distance from edge to trigger snapping
-        
-        // For settings panels, only allow left/right snapping
-        let distances = [
-            (CanvasEdge::Left, position.x - self.canvas_rect.min.x),
-            (CanvasEdge::Right, self.canvas_rect.max.x - (position.x + size.x)),
-        ];
-        
-        // Find the closest edge within snap threshold
-        let closest_edge = distances
-            .iter()
-            .filter(|(_, distance)| *distance < snap_threshold)
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        
-        match closest_edge {
-            Some((edge, _)) => *edge,
-            None => CanvasEdge::None,
-        }
-    }
 
     pub fn show_widget_palette(&mut self, ui: &mut Ui) {
         ui.group(|ui| {
@@ -1524,18 +1405,18 @@ impl DragDropCanvas {
 
             ui.vertical(|ui| {
                 // Instructions
-                if self.pending_widget.is_some() {
-                    ui.colored_label(CYAN, "→ Widget selected - click to place");
+                if let Some(_panel_id) = self.selected_panel {
+                    ui.colored_label(CYAN, "→ Placing widgets in selected panel");
                 } else {
-                    ui.label("Click a widget to select it");
-                    ui.label("Then click where to place it");
+                    ui.label("Click widgets to spawn on canvas");
+                    ui.label("Select a panel first to spawn inside it");
                 }
                 ui.separator();
                 
                 // Knobs
                 let knob_btn = ui.button("🎛️ Knob");
                 if knob_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::Knob {
+                    self.spawn_widget_directly(WidgetType::Knob {
                         value: 50.0,
                         min: 0.0,
                         max: 100.0,
@@ -1558,7 +1439,7 @@ impl DragDropCanvas {
                 // Toggle Switch
                 let toggle_btn = ui.button("🔘 Toggle");
                 if toggle_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::ToggleSwitch {
+                    self.spawn_widget_directly(WidgetType::ToggleSwitch {
                         on: false,
                         label: "TOGGLE".to_string(),
                         color: WidgetColor::Cyan,
@@ -1579,7 +1460,7 @@ impl DragDropCanvas {
                 // Push Button
                 let button_btn = ui.button("🔳 Button");
                 if button_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::PushButton {
+                    self.spawn_widget_directly(WidgetType::PushButton {
                         active: false,
                         icon: "▶".to_string(),
                         label: "PLAY".to_string(),
@@ -1602,7 +1483,7 @@ impl DragDropCanvas {
                 // VU Meter
                 let vu_btn = ui.button("📊 VU Meter");
                 if vu_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::VuMeter {
+                    self.spawn_widget_directly(WidgetType::VuMeter {
                         level: 75.0,
                         peak_level: 80.0,
                         label: "VU".to_string(),
@@ -1623,7 +1504,7 @@ impl DragDropCanvas {
                 // Horizontal Slider
                 let h_slider_btn = ui.button("━ H.Slider");
                 if h_slider_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::HorizontalSlider {
+                    self.spawn_widget_directly(WidgetType::HorizontalSlider {
                         value: 60.0,
                         min: 0.0,
                         max: 100.0,
@@ -1646,7 +1527,7 @@ impl DragDropCanvas {
                 // Vertical Slider
                 let v_slider_btn = ui.button("┃ V.Slider");
                 if v_slider_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::VerticalSlider {
+                    self.spawn_widget_directly(WidgetType::VerticalSlider {
                         value: 75.0,
                         min: 0.0,
                         max: 100.0,
@@ -1669,7 +1550,7 @@ impl DragDropCanvas {
                 // Level Indicator
                 let level_btn = ui.button("▭▭▭ Level");
                 if level_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::LevelIndicator {
+                    self.spawn_widget_directly(WidgetType::LevelIndicator {
                         level: 62.5,
                         segments: 8,
                         label: "INPUT".to_string(),
@@ -1688,7 +1569,7 @@ impl DragDropCanvas {
                 // Text Label
                 let label_btn = ui.button("🏷️ Label");
                 if label_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::TextLabel {
+                    self.spawn_widget_directly(WidgetType::TextLabel {
                         text: "LABEL".to_string(),
                         size: 16.0,
                         color: WidgetColor::Cyan,
@@ -1707,14 +1588,14 @@ impl DragDropCanvas {
                 // Panel
                 let panel_btn = ui.button("📦 Panel");
                 if panel_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::Panel {
+                    self.spawn_widget_directly(WidgetType::Panel {
                         title: "CONTROL PANEL".to_string(),
                         color: WidgetColor::Cyan,
                         width: 200.0,
                         height: 150.0,
                         collapsed: false,
                         contained_widgets: Vec::new(),
-                        minimize_to_settings_icon: false,
+                        minimize_to_settings_icon: true,
                     });
                 }
                 
@@ -1727,14 +1608,14 @@ impl DragDropCanvas {
                         height: 150.0,
                         collapsed: false,
                         contained_widgets: Vec::new(),
-                        minimize_to_settings_icon: false,
+                        minimize_to_settings_icon: true,
                     });
                 }
                 
                 // Status Bar
                 let status_btn = ui.button("📊 Status Bar");
                 if status_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::StatusBar {
+                    self.spawn_widget_directly(WidgetType::StatusBar {
                         cpu: 23.0,
                         ram: 1.2,
                         latency: 2.3,
@@ -1753,9 +1634,9 @@ impl DragDropCanvas {
                 }
                 
                 // Settings Widget
-                let settings_btn = ui.button("⚙️ Settings");
+                let settings_btn = ui.button("⚙ Settings");
                 if settings_btn.clicked() {
-                    self.pending_widget = Some(WidgetType::Settings {
+                    self.spawn_widget_directly(WidgetType::Settings {
                         label: "SETTINGS".to_string(),
                         color: WidgetColor::Cyan,
                         minimized: false,
@@ -1780,7 +1661,7 @@ impl DragDropCanvas {
                 ui.horizontal_wrapped(|ui| {
                     let power_btn = ui.button("⏻ Power");
                     if power_btn.clicked() {
-                        self.pending_widget = Some(WidgetType::IconButton {
+                        self.spawn_widget_directly(WidgetType::IconButton {
                             icon: IconType::Power,
                             label: "POWER".to_string(),
                             active: false,
@@ -1802,7 +1683,7 @@ impl DragDropCanvas {
                     
                     let play_btn = ui.button("▶ Play");
                     if play_btn.clicked() {
-                        self.pending_widget = Some(WidgetType::IconButton {
+                        self.spawn_widget_directly(WidgetType::IconButton {
                             icon: IconType::Play,
                             label: "PLAY".to_string(),
                             active: false,
@@ -1824,7 +1705,7 @@ impl DragDropCanvas {
                     
                     let pause_btn = ui.button("⏸ Pause");
                     if pause_btn.clicked() {
-                        self.pending_widget = Some(WidgetType::IconButton {
+                        self.spawn_widget_directly(WidgetType::IconButton {
                             icon: IconType::Pause,
                             label: "PAUSE".to_string(),
                             active: false,
@@ -1846,7 +1727,7 @@ impl DragDropCanvas {
                     
                     let settings_btn = ui.button("⚙ Settings");
                     if settings_btn.clicked() {
-                        self.pending_widget = Some(WidgetType::IconButton {
+                        self.spawn_widget_directly(WidgetType::IconButton {
                             icon: IconType::Settings,
                             label: "CONFIG".to_string(),
                             active: false,
@@ -1868,7 +1749,7 @@ impl DragDropCanvas {
                     
                     let mic_btn = ui.button("🎤 Mic");
                     if mic_btn.clicked() {
-                        self.pending_widget = Some(WidgetType::IconButton {
+                        self.spawn_widget_directly(WidgetType::IconButton {
                             icon: IconType::Mic,
                             label: "MIC".to_string(),
                             active: false,
@@ -1890,7 +1771,7 @@ impl DragDropCanvas {
                     
                     let mute_btn = ui.button("🔇 Mute");
                     if mute_btn.clicked() {
-                        self.pending_widget = Some(WidgetType::IconButton {
+                        self.spawn_widget_directly(WidgetType::IconButton {
                             icon: IconType::Mute,
                             label: "MUTE".to_string(),
                             active: false,
@@ -2057,12 +1938,12 @@ impl DragDropCanvas {
                                     if ui.radio_value(color, WidgetColor::Red, "Red").clicked() {}
                                 });
                             }
-                            WidgetType::Panel { title, color, width, height, collapsed, contained_widgets, .. } => {
+                            WidgetType::Panel { title, color, width, height, contained_widgets, minimize_to_settings_icon, .. } => {
                                 ui.label("Panel Properties:");
                                 ui.text_edit_singleline(title);
                                 ui.add(egui::Slider::new(width, 100.0..=400.0).text("Width"));
                                 ui.add(egui::Slider::new(height, 100.0..=300.0).text("Height"));
-                                ui.checkbox(collapsed, "Collapsed");
+                                ui.checkbox(minimize_to_settings_icon, "Minimize to ⚙");
                                 ui.label(format!("Contains {} widgets", contained_widgets.len()));
                                 ui.horizontal(|ui| {
                                     ui.label("Color:");
@@ -2156,7 +2037,7 @@ impl DragDropCanvas {
         painter.text(
             icon_pos,
             Align2::LEFT_TOP,
-            "⚙️",
+            "⚙",
             FontId::monospace(20.0),
             Color32::from_rgba_unmultiplied(156, 163, 175, 200), // Semi-transparent gray
         );
@@ -2182,41 +2063,6 @@ impl DragDropCanvas {
     }
     
     
-    // Legacy drop logic removed - using check_and_place_in_panel for all placement
+    // Legacy drop logic removed
     
-    
-    
-    fn render_settings_widget(painter: &egui::Painter, rect: Rect, label: &str, color: WidgetColor) {
-        // Draw background
-        painter.rect_filled(rect, 8.0, GRAY_900);
-        
-        // Draw gradient background
-        let gradient_color = Color32::from_rgba_unmultiplied(
-            color.to_color32().r(),
-            color.to_color32().g(),
-            color.to_color32().b(),
-            20
-        );
-        painter.rect_filled(rect.shrink(2.0), 8.0, gradient_color);
-        
-        // Draw settings icon
-        painter.text(
-            rect.center(),
-            Align2::CENTER_CENTER,
-            "⚙️",
-            FontId::monospace(20.0),
-            color.to_color32(),
-        );
-        
-        // Draw label below if provided
-        if !label.is_empty() {
-            painter.text(
-                Pos2::new(rect.center().x, rect.bottom() - 5.0),
-                Align2::CENTER_BOTTOM,
-                label,
-                FontId::monospace(8.0),
-                GRAY_400,
-            );
-        }
-    }
 }
